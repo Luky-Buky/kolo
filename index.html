@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolo Švindlu</title>
+<style>
+body {
+  margin:0;
+  padding:0;
+  font-family: Arial, sans-serif;
+  background: radial-gradient(circle at top, #111, #000);
+  color: white;
+  text-align:center;
+  overflow-x:hidden;
+}
+h1 {
+  font-size: 3rem;
+  color: #ffcc00;
+  text-shadow: 0 0 15px #ffcc00, 0 0 30px #ff9900;
+  margin: 20px 0;
+}
+.inputBox {
+  margin-bottom: 20px;
+}
+input {
+  padding: 10px;
+  font-size: 16px;
+  width: 300px;
+  border-radius: 6px;
+  border: none;
+}
+button {
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+#create {
+  padding:10px 20px;
+  margin-left:10px;
+  background:#444;
+  color:white;
+}
+.wheelBox {
+  position: relative;
+  display: inline-block;
+  margin-top: 20px;
+}
+canvas {
+  border-radius: 50%;
+  box-shadow: 0 0 40px #ffcc00, 0 0 60px #ff6600;
+  background: #222;
+}
+.pointer {
+  position: absolute;
+  top: 50%; /* umístění uprostřed svisle */
+  left: 50%;
+  transform: translate(-50%, -100%) rotate(180deg); /* hrot směřuje dovnitř */
+  width:0;
+  height:0;
+  border-left:25px solid transparent;
+  border-right:25px solid transparent;
+  border-top:45px solid red;
+  z-index:10;
+  filter: drop-shadow(0 0 10px red);
+}
+#spin {
+  margin-top:25px;
+  padding:18px 60px;
+  font-size:26px;
+  font-weight:bold;
+  color:white;
+  background: linear-gradient(45deg,#ff003c,#ff8c00,#ffd000,#00ffcc);
+  background-size:300% 300%;
+  box-shadow:0 0 20px #ff003c;
+  animation: glow 4s infinite;
+}
+#spin:hover { transform: scale(1.1);}
+@keyframes glow {
+  0% {background-position:0%}
+  50% {background-position:100%}
+  100% {background-position:0%}
+}
+#result {
+  font-size:2.2rem;
+  margin-top:20px;
+  color:#00ffcc;
+  font-weight:bold;
+  text-shadow: 0 0 10px #00ffcc;
+}
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: red;
+  opacity: 0.8;
+  z-index:999;
+  pointer-events:none;
+  border-radius:50%;
+}
+</style>
+</head>
+<body>
+
+<h1>Kolo Švindlu 🎲</h1>
+
+<div class="inputBox">
+<input id="names" placeholder="Zadejte jména oddělená čárkou">
+<button id="create">Vytvořit kolo</button>
+</div>
+
+<div class="wheelBox">
+<canvas id="wheel" width="500" height="500"></canvas>
+<div class="pointer"></div> <!-- šipka směřuje dovnitř -->
+</div>
+
+<button id="spin">SPIN</button>
+
+<div id="result"></div>
+
+<audio id="spinSound" src="https://www.soundjay.com/misc/sounds/spin-1.mp3"></audio>
+
+<script>
+// proměnné
+const canvas=document.getElementById("wheel");
+const ctx=canvas.getContext("2d");
+const spinBtn=document.getElementById("spin");
+const createBtn=document.getElementById("create");
+const result=document.getElementById("result");
+const spinSound=document.getElementById("spinSound");
+
+let names=[];
+let colors=[];
+let angle=0;
+let spinning=false;
+
+// náhodné barvy
+function randomColor(){
+  const c=["#ff595e","#ffca3a","#8ac926","#1982c4","#6a4c93","#ff924c","#00f5d4","#ff66ff"];
+  return c[Math.floor(Math.random()*c.length)];
+}
+
+// kreslení kola
+function drawWheel(){
+  const size=canvas.width/2;
+  const arc=(2*Math.PI)/names.length;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let i=0;i<names.length;i++){
+    const ang=angle+i*arc;
+    const grad=ctx.createRadialGradient(size,size,0,size,size,size);
+    grad.addColorStop(0,"#fff");
+    grad.addColorStop(1,colors[i]);
+    ctx.fillStyle=grad;
+    ctx.beginPath();
+    ctx.moveTo(size,size);
+    ctx.arc(size,size,size,ang,ang+arc);
+    ctx.closePath();
+    ctx.fill();
+    ctx.save();
+    ctx.translate(size,size);
+    ctx.rotate(ang+arc/2);
+    ctx.fillStyle="black";
+    ctx.font="bold 18px Arial";
+    ctx.textAlign="right";
+    ctx.fillText(names[i],size-20,5);
+    ctx.restore();
+  }
+}
+
+// vytvoření kola
+createBtn.onclick=()=>{
+  const input=document.getElementById("names").value;
+  if(!input){alert("Zadejte jména"); return;}
+  names=input.split(",").map(n=>n.trim()).filter(n=>n);
+  colors=names.map(()=>randomColor());
+  angle=0;
+  drawWheel();
+}
+
+// SPIN
+spinBtn.onclick=()=>{
+  if(spinning || names.length===0) return;
+  spinning=true;
+  result.innerText="";
+  spinSound.currentTime=0;
+  spinSound.play();
+
+  let speed=Math.random()*0.3+0.25;
+  const slow=0.995;
+
+  function rotate(){
+    angle+=speed;
+    drawWheel();
+    speed*=slow;
+    if(speed>0.002){
+      requestAnimationFrame(rotate);
+    }else{
+      spinning=false;
+      spinSound.pause();
+      const arc=(2*Math.PI)/names.length;
+      // Šipka směřuje dovnitř dolní části kola (270°)
+      const adjusted=(angle + Math.PI/2) % (2*Math.PI); 
+      const index=Math.floor(names.length - adjusted/arc) % names.length;
+      result.innerText="Vyhrálo: "+names[index];
+      showConfetti();
+    }
+  }
+  rotate();
+}
+
+// konfety
+function showConfetti(){
+  for(let i=0;i<100;i++){
+    const conf=document.createElement("div");
+    conf.classList.add("confetti");
+    conf.style.left=Math.random()*window.innerWidth+"px";
+    conf.style.top="-10px";
+    conf.style.backgroundColor=randomColor();
+    document.body.appendChild(conf);
+    let fall=Math.random()*5+2;
+    let sway=Math.random()*10;
+    let t=0;
+    function animate(){
+      t+=0.02;
+      conf.style.top=parseFloat(conf.style.top)+fall+"px";
+      conf.style.left=parseFloat(conf.style.left)+Math.sin(t)*sway+"px";
+      if(parseFloat(conf.style.top)<window.innerHeight){
+        requestAnimationFrame(animate);
+      }else{
+        conf.remove();
+      }
+    }
+    animate();
+  }
+}
+</script>
+</body>
+</html>
